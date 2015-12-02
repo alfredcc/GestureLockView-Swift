@@ -7,6 +7,7 @@ A Gesture Lock View For iOS written by Swift.
 - 设置、修改密码Demo
 - 加入 Stroyboard 支持
 - 加入错误提示动画
+
 # Requirements
 Swift 2.0, iOS 8.0
 
