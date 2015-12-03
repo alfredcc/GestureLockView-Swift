@@ -8,7 +8,7 @@
 
 import UIKit
 
-protocol GestureLockViewDelegate:class {
+protocol GestureLockViewDelegate:NSObjectProtocol {
     func gestureLockView(gestureLockView: GestureLockView, didBeginWithPasscode passcode:String)
     func gestureLockView(gestureLockView: GestureLockView, didEndWithPasscode passcode:String)
     func gestureLockView(gestureLockView: GestureLockView, didCanceledWithPasscode passcode:String)
@@ -16,8 +16,14 @@ protocol GestureLockViewDelegate:class {
 
 class GestureLockView: UIView {
 
+    private let kNodesPerRow = 3
+    private let kNodeHeight = 60.0
+    private let kNodeWidth = 60.0
+    private let kTrackedLocationInvalidValue: CGFloat = -1.0
+
     weak var delegate: GestureLockViewDelegate?
-    var numberOfNodes: Int!{
+
+    var numberOfNodes: Int! {
         didSet {
             // 根据 Node 数量生成 Node 并添加到 View 中
             if nodes.count > 0 {
@@ -33,29 +39,28 @@ class GestureLockView: UIView {
                 node.bounds = CGRect(x: 0, y: 0, width: kNodeWidth, height: kNodeHeight)
                 node.backgroundColor = UIColor.clearColor()
                 node.userInteractionEnabled = false
-                if let nomalImage = nomalNodeImage {
-                    node.setImage(nomalImage, forState: .Normal)
-                }
-                if let selectImage = selectedNodeImage {
-                    node.setImage(selectImage, forState: .Selected)
-                }
+                node.setImage(normalNodeImage, forState: .Normal)
+                node.setImage(selectedNodeImage, forState: .Selected)
+
                 self.addSubview(node)
                 nodes.append(node)
             }
         }
     }
 
-    private let kNodesPerRow = 3
-    private let kNodeHeight = 60.0
-    private let kNodeWidth = 60.0
-    private let kTrackedLocationInvalidValue: CGFloat = -1.0
-
-
-    var nodes = [UIButton]()
-    var nodeSize: CGSize!
-    var nomalNodeImage: UIImage?
-    var selectedNodeImage: UIImage?
-    var selectedNodes = [UIButton]()
+    private var nodes = [UIButton]()
+    private var selectedNodes = [UIButton]()
+    private var nodeSize: CGSize!
+    var normalNodeImage: UIImage! {
+        didSet {
+            restNodeWithImage(normalNodeImage, forState: .Normal)
+        }
+    }
+    var selectedNodeImage: UIImage! {
+        didSet {
+            restNodeWithImage(selectedNodeImage, forState: .Selected)
+        }
+    }
 
     let nodeLineWidth: CGFloat = 5
     let lineColor = UIColor.whiteColor().colorWithAlphaComponent(0.5)
@@ -98,12 +103,24 @@ class GestureLockView: UIView {
     func viewInitialize() {
         backgroundColor = UIColor.blackColor()
         nodeSize = CGSize(width: kNodeHeight, height: kNodeHeight)
-        nomalNodeImage = roundImageWithColor(UIColor.greenColor(), size: nodeSize)
-        selectedNodeImage = roundImageWithColor(UIColor.redColor(), size: nodeSize)
         numberOfNodes = 9
+        normalNodeImage = imageWithColor(UIColor.greenColor(), size: nodeSize)
+        selectedNodeImage = imageWithColor(UIColor.redColor(), size: nodeSize)
     }
 
-    func roundImageWithColor(color: UIColor, size: CGSize) -> UIImage {
+    func restNodeWithImage(image: UIImage, forState state: UIControlState) {
+        var newNodeSize = CGSize()
+        newNodeSize.width = nodeSize.width > image.size.width ? nodeSize.width : image.size.width
+        newNodeSize.height = nodeSize.height > image.size.height ? nodeSize.height : image.size.height
+        nodeSize = newNodeSize
+        if nodes.count > 0 {
+            for node in nodes {
+                node.setImage(image, forState: state)
+            }
+        }
+    }
+
+    func imageWithColor(color: UIColor, size: CGSize) -> UIImage {
         let rect = CGRect(x: 0.0, y: 0.0, width: size.width, height: size.height)
         UIGraphicsBeginImageContext(rect.size)
         let context = UIGraphicsGetCurrentContext()
@@ -112,7 +129,7 @@ class GestureLockView: UIView {
         CGContextFillRect(context, rect)
         let image = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
-        
+
         return image
     }
 
@@ -167,10 +184,14 @@ class GestureLockView: UIView {
                     if selectedNodes.indexOf(touchedNode) == nil {
                         touchedNode.selected = true
                         selectedNodes.append(touchedNode)
+                        //If the touched button is the first button in the selected buttons,
+                        //It's the beginning of the passcode creation
+                        if selectedNodes.count == 1 {
+                            delegate?.gestureLockView(self, didBeginWithPasscode: String(touchedNode.tag))
+                        }
+
                     }
-                    //If the touched button is the first button in the selected buttons,
-                    //It's the beginning of the passcode creation
-                    delegate?.gestureLockView(self, didBeginWithPasscode: String(touchedNode.tag))
+
                 }
             }
         }
@@ -182,7 +203,7 @@ class GestureLockView: UIView {
             var passCode = ""
             for node in selectedNodes {
                 passCode += "\(node.tag)"
-                 // 重置选中状态
+                // 重置选中状态
                 node.selected = false
             }
             selectedNodes.removeAll()
